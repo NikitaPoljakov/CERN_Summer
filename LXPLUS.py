@@ -337,11 +337,11 @@ def EvolveEuler(Ba, BaH, filename, temp):
         Ba_positions = [Ba.x, Ba.y, Ba.z]
         BaH_positions = [BaH.x, BaH.y, BaH.z]
 
-    with open('Last Secular Period Positions.npy', 'wb') as f:
+    with open('Positions.npy', 'wb') as f:
         np.save(f, Ba_positions)
         np.save(f, BaH_positions)
         
-    with open('Last Secular Period Speeds.npy', 'wb') as f:
+    with open('Speeds.npy', 'wb') as f:
         np.save(f, Ba_speeds)
         np.save(f, BaH_speeds)
 
