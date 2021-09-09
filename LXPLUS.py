@@ -570,19 +570,19 @@ U_endcap = a_lc*m_Ba*(w**2)*r_0**2/(4*charge*alpha) # [V], endcap DC voltage
 V_RF = q_lc*m_Ba*(w**2)*r_0**2/(2*charge) # [V], RF voltage amplitude
 
 # Simulation parameters
-N_Ba = 20 # number of Ba+ particles
-N_BaH = 20 # number of BaH+ particles
+N_Ba = 500 # number of Ba+ particles
+N_BaH = 500 # number of BaH+ particles
 particles = N_Ba+N_BaH
 R = 10**(-4) # [m], radius of the sphere over which the particles are uniformly distributed
 dt = tau # [s], timestep, cannot be larger than 1/f = 2 * 10^(-6) s
-time = 1*10**(-3) # [s], total simulation time in s
+time = 7*10**(-3) # [s], total simulation time in s
 time_end = 0.1*10**(-3) # [s], time after laser cooling for the system to reach equilibrium
 ms = int(time*10**(3)) # [ms], simulation time in ms
 T = int(time/dt) # number of timesteps for the whole simulation
 T_RF = int(1/(f*dt)) # timesteps in an RF period
 T_secular = int(2/(f*dt*np.sqrt(a_sc+((q_sc**2)/2)))) # Number of timesteps in a secular period
 T_ms = int(10**(-3)/dt) # Number of timesteps in 1 ms
-temp = 1 # [K], initial temperature
+temp = 10 # [K], initial temperature
 
 # Main Code
 Compute(temp)
