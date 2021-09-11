@@ -1,5 +1,5 @@
 import numpy as np
-import random
+from random import shuffle
 
 class Ion():
 
@@ -36,8 +36,8 @@ class Ion():
 
         # Cylindrical polar coords
         phi = np.random.uniform(0, 2*np.pi, N)
-        z = np.random.uniform(-0.1*10**(-3), 0.1*10**(-3), N)
-        r = np.random.uniform(R-0.0001, R+0.0001, N)
+        z = np.random.uniform(-0.5*10**(-3), 0.5*10**(-3), N)
+        r = np.random.uniform(R-0.0002, R+0.0002, N)
 
         x = r*np.cos(phi)
         y = r*np.sin(phi)
@@ -273,7 +273,7 @@ def EvolveEuler(Ba, BaH, mode):
         BaH.y = BaH.y + BaH.vy*dt
         BaH.z = BaH.z + BaH.vz*dt
 
-        # Perform the laser sweep until time-time_end
+        # Perform the laser sweep before the final 0.1 ms of the simulation
         if mode == "laser" and t < T - int(time_end/dt):
             LaserCool(Ba, float((t/T)*time))
             
@@ -312,16 +312,15 @@ def LaserCool(Ba, t):
         if Ba.state[n] == "e":
             EmitAPhoton(Ba, n)
 
-            # Absorb a photon from a randomly selected laser
-            lasers = [Laser1(Ba, n, f_0), Laser2(Ba, n, f_0), Laser3(Ba, n, f_0), Laser4(Ba, n, f_0), Laser5(Ba, n, f_0), Laser6(Ba, n, f_0)]
-            random.shuffle(lasers)
-            
-            for laser in lasers:
-                laser()
+        # Absorb a photon from a randomly selected laser
+        lasers = [FirstLaser, SecondLaser, ThirdLaser, FourthLaser, FifthLaser, SixthLaser]
+        shuffle(lasers)
+
+        for laser in lasers:
+            laser(Ba, n, f_0)
 
 
-def Laser1(Ba, n, f_0):
-    
+def FirstLaser(Ba, n, f_0):
     # Z Laser
     v_proj = -Ba.vz[n]
     # Use the Accept-Reject algorithm to decide whether the ion absorbs a photon or not
@@ -333,7 +332,7 @@ def Laser1(Ba, n, f_0):
         Ba.state[n] = "e"
 
 
-def Laser2(Ba, n, f_0):
+def SecondLaser(Ba, n, f_0):
     
     # Z Laser
     v_proj = Ba.vz[n]
@@ -346,7 +345,7 @@ def Laser2(Ba, n, f_0):
         Ba.state[n] = "e"
 
 
-def Laser3(Ba, n, f_0):
+def ThirdLaser(Ba, n, f_0):
     
     # XY Laser
     v_proj = (Ba.vx[n] + Ba.vy[n])/np.sqrt(2)
@@ -360,7 +359,7 @@ def Laser3(Ba, n, f_0):
         Ba.state[n] = "e"
 
 
-def Laser4(Ba, n, f_0):
+def FourthLaser(Ba, n, f_0):
     
     # XY Laser
     v_proj = -(Ba.vx[n] + Ba.vy[n])/np.sqrt(2)
@@ -374,7 +373,7 @@ def Laser4(Ba, n, f_0):
         Ba.state[n] = "e"
 
 
-def Laser5(Ba, n, f_0):
+def FifthLaser(Ba, n, f_0):
     
     # XY Laser
     v_proj = (-Ba.vx[n] + Ba.vy[n])/np.sqrt(2)
@@ -388,7 +387,7 @@ def Laser5(Ba, n, f_0):
         Ba.state[n] = "e"
 
 
-def Laser6(Ba, n, f_0):
+def SixthLaser(Ba, n, f_0):
 
     # XY Laser
     v_proj = (Ba.vx[n] - Ba.vy[n])/np.sqrt(2)
@@ -473,11 +472,11 @@ def Compute():
 
     #Laser Sweep
     v_max = np.mean(np.sqrt(Ba.vx**2 + Ba.vy**2 + Ba.vz**2)) # [m/s], maximal value of the velocity projection that will absorb laser photons
-    v_min = (h*f_r)/(2*m_Ba*c) + (l_r*Gamma/2) # [m/s], recoil limit + 2xHWHM
+    v_min = (h*f_r)/(2*m_Ba*c) + (l_r*Gamma/2) # [m/s], recoil limit + HWHM
     f_max = f_r/(1+(v_min/c))
     f_min = f_r/(1+(v_max/c))
 
-    EvolveEuler(Ba, BaH, "Laser")
+    EvolveEuler(Ba, BaH, "laser")
 
     del Ba, BaH
 
@@ -513,7 +512,7 @@ V_RF = 50 # [V], RF voltage amplitude
 N_Ba = 500 # number of Ba+ particles
 N_BaH = 500 # number of BaH+ particles
 particles = N_Ba+N_BaH
-R = 10**(-4) # [m], radius of the sphere over which the particles are uniformly distributed
+R = 2.4*10**(-3) # [m], radius of the sphere over which the particles are uniformly distributed
 dt = tau # [s], timestep, cannot be larger than 1/f = 2 * 10^(-6) s
 time = 3*10**(-3) # [s], total simulation time in s
 time_end = 0.1*10**(-3) # [s], time after laser cooling for the system to reach equilibrium
@@ -523,7 +522,6 @@ T_RF = int(1/(f*dt)) # timesteps in an RF period
 T_secular = int(2/(f*dt*np.sqrt(-0.001+((0.4**2)/2)))) # Number of timesteps in a secular period
 T_ms = int(10**(-3)/dt) # Number of timesteps in 1 ms
 temp = 1 # [K], initial temperature
-
 
 # Main Code
 Compute()
