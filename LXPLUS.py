@@ -410,7 +410,7 @@ def LinearFrequencySweep(t):
     Args:
         t (float): time
     """
-    
+
     return f_min + (f_max-f_min) * t / (time - time_end)
 
 
@@ -462,7 +462,7 @@ def AcceptRejectLorentzian():
             continue
 
 
-def Compute(temp):
+def Compute():
     """Compute positions and velocities for three different
     cases with the same initial conditions."""
 
@@ -510,8 +510,8 @@ U_end = 5 # [V], endcap DC voltage
 V_RF = 50 # [V], RF voltage amplitude
 
 # Simulation parameters
-N_Ba = 500 # number of Ba+ particles
-N_BaH = 500 # number of BaH+ particles
+N_Ba = 5 # number of Ba+ particles
+N_BaH = 5 # number of BaH+ particles
 particles = N_Ba+N_BaH
 R = 10**(-4) # [m], radius of the sphere over which the particles are uniformly distributed
 dt = tau # [s], timestep, cannot be larger than 1/f = 2 * 10^(-6) s
@@ -526,4 +526,4 @@ temp = 1 # [K], initial temperature
 
 
 # Main Code
-Compute(temp)
+Compute()
