@@ -13,7 +13,6 @@ class Ion():
             N (int): number of ions in the ensemble
         """
 
-
         self.x, self.y, self.z = self.InitialPositions(N)
         self.vx, self.vy, self.vz = self.InitialVelocities(N, mass, temp)
         self.mass = mass
@@ -36,8 +35,10 @@ class Ion():
 
         # Cylindrical polar coords
         phi = np.random.uniform(0, 2*np.pi, N)
-        z = np.random.uniform(-0.5*10**(-3), 0.5*10**(-3), N)
-        r = np.random.uniform(R-0.0002, R+0.0002, N)
+        z = np.random.uniform(-0.6*10**(-3), 0.6*10**(-3), N)
+        r = np.zeros(N)
+        for n in range(N):
+            r[n] = self.AcceptRejectRadius(R)
 
         x = r*np.cos(phi)
         y = r*np.sin(phi)
@@ -52,7 +53,7 @@ class Ion():
         the velocity directions are
         distributed uniformly over a unit
         sphere.
-        
+
         Args:
             N (int): number of ions in the ensemble
             
@@ -79,7 +80,7 @@ class Ion():
         return vx, vy, vz
 
 
-    def Maxwellian(self, v, T, mass):
+    def Maxwellian(v, T, mass):
         """Normalised Maxwellian velocity distribution
         in 3D.
         
@@ -113,8 +114,8 @@ class Ion():
 
         while True:
             v = 1000 * np.random.rand()
-            y = (np.sqrt(2*k_B*temp/mass)) * np.random.rand()
-            if y < self.Maxwellian(v, temp, mass):
+            y = Ion.Maxwellian(np.sqrt(2*k_B*temp/mass), temp, mass) * np.random.rand()
+            if y < Ion.Maxwellian(v, temp, mass):
                 return v
             else:
                 continue
@@ -163,24 +164,79 @@ class Ion():
                 continue
 
 
-def XRFPseudoForce(m, x, y):
-
-    return - (6 * (charge**2) * (V_RF**2) / (m * (r_0**8) * (w**2))) * x * (((x**2)+(y**2))**2)
-
-
-def YRFPseudoForce(m, x, y):
-
-    return - (6 * (charge**2) * (V_RF**2) / (m * (r_0**8) * (w**2))) * y * (((x**2)+(y**2))**2)
-
-
-def RadialStaticPseudoForce(r):
+def RadialPseudoForce(m, r, a, q):
+    """Quadrupole pseudoforce due to the oscillating
+    RF force.
     
-    return - ((charge * alpha * U_end)/(r_0**2)) * r
+    Args:
+        m (float): mass of the particle, [kg]
+        
+        r (float): radial distance of the particle from
+        the centre of the potential well, [m]
+    
+    Returns:
+        (float): restoring force, [N]
+    """    
+
+    return -m*(w**2)*(a+((q**2)/2)) * r / 4
 
 
-def AxialStaticPseudoForce(z): 
+def XRFForce(m, x, t, a, q):
+    """RF-Force in the x-direction calculated
+    from the Mathieu equation for a linear Paul
+    trap. 
+    
+    Args:
+        m (float): mass of the particle, [kg]
+        
+        x (float): x-distance of the particle
+        from the centre of the potential well, [m]
+        
+        t (float): time of the simulation, [s]
+        
+    Returns:
+        (float): force, [N]
+    """
 
-    return ((2 * charge * alpha * U_end)/(r_0**2)) * z
+    return m * (-a+2*q*np.cos(w*t)) * ((w**2)/4) * x
+
+
+def YRFForce(m, y, t, a, q):
+    """RF-Force in the y-direction calculated
+    from the Mathieu equation for a linear Paul
+    trap. 
+    
+    Args:
+        m (float): mass of the particle, [kg]
+        
+        y (float): y-distance of the particle
+        from the centre of the potential well, [m]
+        
+        t (float): time of the simulation, [s]
+        
+    Returns:
+        (float): force, [N]
+    """
+    
+
+    return m * (-a-2*q*np.cos(w*t)) * ((w**2)/4) * y
+
+
+def ZPseudoForce(m, z, a, q):
+    """Force due to the DC endcap potential.
+
+    Args:
+        z (float): z-distance of the particle
+        from the centre of the potential well, [m]
+
+        t (float): time of the simulation, [s]
+
+    Returns:
+        (float): force, [N]. The parameter A is
+        obtained from COMSOL simulations.
+    """
+
+    return m * (w**2) * a * z / 2
 
 
 def CoulombForce(x, y, z, N):
@@ -190,7 +246,7 @@ def CoulombForce(x, y, z, N):
     Args:
         x, y, z (float): arrays with cartesian
         coordinates of Ba+ and BaH+ ions
-
+        
         N (int): number of particles
         
     Returns:
@@ -225,7 +281,9 @@ def EvolveEuler(Ba, BaH, mode):
         BaH (obj): object containing parameters
         of a BaH+ ion such as position and velocities
     
-        mode (str): trigger laser cooling
+        filename (str): title of the file where the
+        evolved velocities are saved to; also used
+        to trigger laser cooling
         
         temp (float): initial temperature of
         the simulation, used for writing the 
@@ -259,31 +317,31 @@ def EvolveEuler(Ba, BaH, mode):
         XCoulombForceBa, YCoulombForceBa, ZCoulombForceBa = XCoulombForce[:Ba.N:], YCoulombForce[:Ba.N:], ZCoulombForce[:Ba.N:]
         XCoulombForceBaH, YCoulombForceBaH, ZCoulombForceBaH = XCoulombForce[Ba.N::], YCoulombForce[Ba.N::], ZCoulombForce[Ba.N::]
 
-        Ba.vx = Ba.vx + ((XRFPseudoForce(Ba.mass, Ba.x, Ba.y) + RadialStaticPseudoForce(Ba.x) + XCoulombForceBa)/Ba.mass)*dt
-        Ba.vy = Ba.vy + ((YRFPseudoForce(Ba.mass, Ba.x, Ba.y) + RadialStaticPseudoForce(Ba.y) + YCoulombForceBa)/Ba.mass)*dt
-        Ba.vz = Ba.vz + ((AxialStaticPseudoForce(Ba.z) + ZCoulombForceBa)/Ba.mass)*dt
+        Ba.vx = Ba.vx + ((XRFForce(Ba.mass, Ba.x, t*dt, a_lc, q_lc) + XCoulombForceBa)/Ba.mass)*dt
+        Ba.vy = Ba.vy + ((YRFForce(Ba.mass, Ba.y, t*dt, a_lc, q_lc) + YCoulombForceBa)/Ba.mass)*dt
+        Ba.vz = Ba.vz + ((ZPseudoForce(Ba.mass, Ba.z, a_lc, q_lc) + ZCoulombForceBa)/Ba.mass)*dt
         Ba.x = Ba.x + Ba.vx*dt
         Ba.y = Ba.y + Ba.vy*dt
         Ba.z = Ba.z + Ba.vz*dt
 
-        BaH.vx = BaH.vx + ((XRFPseudoForce(BaH.mass, BaH.x, BaH.y) + RadialStaticPseudoForce(BaH.x) + XCoulombForceBaH)/BaH.mass)*dt
-        BaH.vy = BaH.vy + ((YRFPseudoForce(BaH.mass, BaH.x, BaH.y) + RadialStaticPseudoForce(BaH.y) + YCoulombForceBaH)/BaH.mass)*dt
-        BaH.vz = BaH.vz + ((AxialStaticPseudoForce(BaH.z) + ZCoulombForceBaH)/BaH.mass)*dt
+        BaH.vx = BaH.vx + ((XRFForce(BaH.mass, BaH.x, t*dt, a_sc, q_sc) + XCoulombForceBaH)/BaH.mass)*dt
+        BaH.vy = BaH.vy + ((YRFForce(BaH.mass, BaH.y, t*dt, a_sc, q_sc) + YCoulombForceBaH)/BaH.mass)*dt
+        BaH.vz = BaH.vz + ((ZPseudoForce(BaH.mass, BaH.z, a_sc, q_sc) + ZCoulombForceBaH)/BaH.mass)*dt
         BaH.x = BaH.x + BaH.vx*dt
         BaH.y = BaH.y + BaH.vy*dt
         BaH.z = BaH.z + BaH.vz*dt
 
-        # Perform the laser sweep before the final 0.1 ms of the simulation
+        # Perform the laser sweep until time-time_end
         if mode == "laser" and t < T - int(time_end/dt):
             LaserCool(Ba, float((t/T)*time))
-            
+
         Ba_positions = [Ba.x, Ba.y, Ba.z]
         BaH_positions = [BaH.x, BaH.y, BaH.z]
 
     with open('Positions.npy', 'wb') as f:
         np.save(f, Ba_positions)
         np.save(f, BaH_positions)
-        
+
     with open('Speeds.npy', 'wb') as f:
         np.save(f, Ba_speeds)
         np.save(f, BaH_speeds)
@@ -321,6 +379,7 @@ def LaserCool(Ba, t):
 
 
 def FirstLaser(Ba, n, f_0):
+    
     # Z Laser
     v_proj = -Ba.vz[n]
     # Use the Accept-Reject algorithm to decide whether the ion absorbs a photon or not
@@ -400,36 +459,44 @@ def SixthLaser(Ba, n, f_0):
         Ba.vy[n] = Ba.vy[n] + ((h*f_0)/(np.sqrt(2)*Ba.mass*c))
         Ba.state[n] = "e"
 
-
 def LinearFrequencySweep(t):
     """Calculate the frequency at a time t
     fo r a linear frequency sweep with a 
     period over the whole simulation.
     
     Args:
-        t (float): time
+        t (float): current time of the simulation, [s]
+        
+    Returns:
+        (float): laser photon frequency at time t, [Hz]
     """
-
+    
     return f_min + (f_max-f_min) * t / (time - time_end)
 
 
-def EmitAPhoton(Ba, n):
+def EmitAPhoton(ion, n):
     """Emit a photon in an arbitrary direction.
     Aberration not included.
+    
+    Args:
+        ion (obj): object containing positions and velocities
+        of ion species to be cooled
+        
+        n (int): index of the ion that is emitting a photon
     """
 
     #Pick random emission directions isotropically over a unit sphere
     phi = np.random.uniform(0, 2*np.pi)
-    theta = Ba.AcceptRejectTheta()
+    theta = ion.AcceptRejectTheta()
 
     freq = AcceptRejectLorentzian()
 
     # The particle will recoil in the opposite direction of the photon emission
-    Ba.vx[n] -= ((h*freq)/(Ba.mass*c))*np.sin(theta)*np.cos(phi)
-    Ba.vy[n] -= ((h*freq)/(Ba.mass*c))*np.sin(theta)*np.sin(phi)
-    Ba.vz[n] -= ((h*freq)/(Ba.mass*c))*np.cos(theta)
+    ion.vx[n] -= ((h*freq)/(ion.mass*c))*np.sin(theta)*np.cos(phi)
+    ion.vy[n] -= ((h*freq)/(ion.mass*c))*np.sin(theta)*np.sin(phi)
+    ion.vz[n] -= ((h*freq)/(ion.mass*c))*np.cos(theta)
 
-    Ba.state[n] = "g"
+    ion.state[n] = "g"
 
 
 def Lorentzian(v_proj, f_laser):
@@ -461,7 +528,29 @@ def AcceptRejectLorentzian():
             continue
 
 
-def Compute():
+def Temperatures(v, N_ions, mass):
+    """Calculate the mean temperature for each ms,
+    averaged over a secular period. In particular,
+    we average the velocity of an ion over the
+    secular period and then calculate the RMS
+    over all ions. Finally, convert the RMS
+    into temperature. """
+
+    temp = np.zeros(ms) # Temperatures of ions for each ms
+
+    for millisecond in range(ms): # Loop over the milliseconds in the simulation
+        v_avg = np.zeros(N_ions) # Average velocity over a secular period for each ion
+        for timestep in range(T_secular): # Loop over the number of elements saved for each millisecond
+            for n in range(N_ions):
+                v_avg[n] += v[(millisecond*T_secular + timestep)*N_ions + n]/T_secular # Average over the secular period
+
+        v_RMS = np.sqrt(np.mean(v_avg**2)) # Average over particles
+        temp[millisecond] = mass * v_RMS**2 / (3 * k_B)
+
+    return temp
+
+
+def Compute(temp):
     """Compute positions and velocities for three different
     cases with the same initial conditions."""
 
@@ -472,10 +561,12 @@ def Compute():
 
     #Laser Sweep
     v_max = np.mean(np.sqrt(Ba.vx**2 + Ba.vy**2 + Ba.vz**2)) # [m/s], maximal value of the velocity projection that will absorb laser photons
-    v_min = (h*f_r)/(2*m_Ba*c) + (l_r*Gamma/2) # [m/s], recoil limit + HWHM
+    v_min = (h*f_r)/(2*m_Ba*c) + (l_r*Gamma/2) # [m/s], recoil limit + 2xHWHM
     f_max = f_r/(1+(v_min/c))
     f_min = f_r/(1+(v_max/c))
 
+    #EvolveEuler(Ba, BaH, "Without laser")
+    #EvolveEuler(Ba, BaH, "Laser without sweep")
     EvolveEuler(Ba, BaH, "laser")
 
     del Ba, BaH
@@ -501,27 +592,31 @@ tau = 7.8 * 10**(-9) # [s], lifetime of the excited state
 Gamma = 1/(2*np.pi*tau) # [Hz], resonance full width, FWHM of the Lorentzian, 2xerror in resonance frequency
 
 # Trap parameters
-alpha = -0.0390 # Aarhus trap parameter
+a_lc = -0.001 # For laser cooled Ba+
+q_lc = 0.4 # For laser cooled Ba+
+a_sc = a_lc * (m_Ba/m_BaH) # For sympathetically cooled BaH+
+q_sc = q_lc * (m_Ba/m_BaH) # For sympathetically cooled BaH+
+alpha = -0.0243 # Aarhus trap parameter
 f = 0.5 * 10**6 # [MHz], RF frequency
 w = 2*np.pi*f
 r_0 = 0.0075 # [m], radius of the trap
-U_end = 5 # [V], endcap DC voltage
-V_RF = 50 # [V], RF voltage amplitude
+U_endcap = a_lc*m_Ba*(w**2)*r_0**2/(4*charge*alpha) # [V], endcap DC voltage
+V_RF = q_lc*m_Ba*(w**2)*r_0**2/(2*charge) # [V], RF voltage amplitude
 
 # Simulation parameters
-N_Ba = 500 # number of Ba+ particles
-N_BaH = 500 # number of BaH+ particles
+N_Ba = 100 # number of Ba+ particles
+N_BaH = 100 # number of BaH+ particles
 particles = N_Ba+N_BaH
-R = 2.4*10**(-3) # [m], radius of the sphere over which the particles are uniformly distributed
+R = 0.5*10**(-4) # [m], radius of the sphere over which the particles are uniformly distributed
 dt = tau # [s], timestep, cannot be larger than 1/f = 2 * 10^(-6) s
-time = 3*10**(-3) # [s], total simulation time in s
+time = 20*10**(-3) # [s], total simulation time in s
 time_end = 0.1*10**(-3) # [s], time after laser cooling for the system to reach equilibrium
 ms = int(time*10**(3)) # [ms], simulation time in ms
 T = int(time/dt) # number of timesteps for the whole simulation
 T_RF = int(1/(f*dt)) # timesteps in an RF period
-T_secular = int(2/(f*dt*np.sqrt(-0.001+((0.4**2)/2)))) # Number of timesteps in a secular period
+T_secular = int(2/(f*dt*np.sqrt(a_sc+((q_sc**2)/2)))) # Number of timesteps in a secular period
 T_ms = int(10**(-3)/dt) # Number of timesteps in 1 ms
-temp = 1 # [K], initial temperature
+temp = 100 # [K], initial temperature
 
 # Main Code
-Compute()
+Compute(temp)
