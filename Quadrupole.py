@@ -1141,7 +1141,7 @@ def Analyse():
     PlotSpeeds(v_Ba, v_BaH)
 
     # Plot hydrogen temperatures after photodissociation
-    PlotHydrogenTemperatures(v_BaH[(ms - 1)*T_secular*N_BaH::])
+    PlotHydrogenTemperatures(v_BaH)
 
 
 # Fundamental constants
