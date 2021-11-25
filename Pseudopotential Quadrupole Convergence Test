@@ -1225,23 +1225,7 @@ for i in range(no_convergence):
     Compute("load", dt_array[i])
     energySlopes[i], xMomentumSlopes[i], yMomentumSlopes[i], zMomentumSlopes[i] = Analyse("dt = " + str(np.round(dt_array[i]/tau)) + "tau")
 
-with open('Energy Slopes.npy', 'rb') as f:
-    for i in range(len(dt_array)):
-        energySlopes = np.append(energySlopes, np.load(f))
-
-with open('X-Momentum Slopes.npy', 'rb') as f:
-    for i in range(len(dt_array)):
-        xMomentumSlopes = np.append(xMomentumSlopes, np.load(f))
-
-with open('Y-Momentum Slopes.npy', 'rb') as f:
-    for i in range(len(dt_array)):
-        yMomentumSlopes = np.append(yMomentumSlopes, np.load(f))
-
-with open('Z-Momentum Slopes.npy', 'rb') as f:
-    for i in range(len(dt_array)):
-        zMomentumSlopes = np.append(zMomentumSlopes, np.load(f))
-
 plotConvergence(energySlopes, "Energy (meV)", "Energy Slope Convergence")
-#plotConvergence(xMomentumSlopes, "X-Momentum (keV/c)", "X-Momentum Slope Convergence")
-#plotConvergence(yMomentumSlopes, "Y-Momentum (keV/c)", "Y-Momentum SLope Convergence")
-#plotConvergence(zMomentumSlopes, "Z-Momentum (keV/c)", "Z-Momentum Slope Convergence")
+plotConvergence(xMomentumSlopes, "X-Momentum (keV/c)", "X-Momentum Slope Convergence")
+plotConvergence(yMomentumSlopes, "Y-Momentum (keV/c)", "Y-Momentum SLope Convergence")
+plotConvergence(zMomentumSlopes, "Z-Momentum (keV/c)", "Z-Momentum Slope Convergence")
