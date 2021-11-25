@@ -21,15 +21,15 @@ class Ion():
             self.x, self.y, self.z = self.InitialPositions(N)
             self.vx, self.vy, self.vz = self.InitialVelocities(N, mass, temp)
 
-            with open('Initial Positions' + species + '.npy', 'rb') as f:
-                self.x = np.load(f)
-                self.y = np.load(f)
-                self.z = np.load(f)
+            with open('Initial Positions' + species + '.npy', 'wb') as f:
+                np.save(f, self.x)
+                np.save(f, self.y)
+                np.save(f, self.z)
 
-            with open('Initial Velocities' + species + '.npy', 'rb') as f:
-                self.vx = np.load(f)
-                self.vy = np.load(f)
-                self.vz = np.load(f)
+            with open('Initial Velocities' + species + '.npy', 'wb') as f:
+                np.save(f, self.vx)
+                np.save(f, self.vy)
+                np.save(f, self.vz)
 
 
         elif mode == "load":
@@ -466,7 +466,7 @@ def CoulombPotential(x, y, z, N):
     return potential
 
 
-def EvolveEuler(Ba, BaH, mode):
+def EvolveEuler(Ba, BaH, mode, dt):
     """Euler method. During each timestep evolve
     ions using Mathieu equations, add Coulomb
     interactions and then laser cool. Save the
@@ -482,6 +482,9 @@ def EvolveEuler(Ba, BaH, mode):
     
         mode (str): trigger laser cooling
     """
+
+    T = int(time/dt) # number of timesteps for the whole simulation
+    T_step = int(t_step/dt) # number of simulation timesteps in a convergence timestep
 
     Ba_x = np.array([])
     Ba_y = np.array([])
@@ -997,13 +1000,15 @@ def plotEnergy(energy, title):
     ax.set_xlabel("Time (ms)", **font, size = 18)
     ax.set_ylabel("Energy (meV)", **font, size = 18)
 
-    m, c = np.polyfit(time, energy, 1)
-    fit = np.polyval([m, c], time)
-    ax.plot(time, fit, '-', color = orange, linewidth = 3, label = "E = " + str(np.round(m, 4)) + "t + " + str(np.round(c, 4)))
+    slope, c = np.polyfit(time, energy, 1)
+    fit = np.polyval([slope, c], time)
+    ax.plot(time, fit, '-', color = orange, linewidth = 3, label = "E = " + str(np.round(slope, 4)) + "t + " + str(np.round(c, 4)))
 
     plt.legend(prop={'size': 18})
     plt.savefig(title + ".pdf")
     plt.show()
+    
+    return slope
 
 
 def TotalMomentum(Ba_vi, BaH_vi):
@@ -1034,17 +1039,17 @@ def plotMomentum(px, py, pz, title):
     ax3.set_xlabel("Time (ms)", **font, size = 18)
     ax3.set_ylabel("Z-Momentum (keV/c)", **font, size = 18)
 
-    m, c = np.polyfit(time, px, 1)
-    fit = np.polyval([m, c], time)
-    ax1.plot(time, fit, '-', color = orange, linewidth = 3, label = "p = " + str(np.round(m, 4)) + "t + " + str(np.round(c, 4)))
+    slopeX, c = np.polyfit(time, px, 1)
+    fit = np.polyval([slopeX, c], time)
+    ax1.plot(time, fit, '-', color = orange, linewidth = 3, label = "p = " + str(np.round(slopeX, 4)) + "t + " + str(np.round(c, 4)))
 
-    m, c = np.polyfit(time, py, 1)
-    fit = np.polyval([m, c], time)
-    ax2.plot(time, fit, '-', color = 'b', linewidth = 3, label = "p = " + str(np.round(m, 4)) + "t + " + str(np.round(c, 4)))
+    slopeY, c = np.polyfit(time, py, 1)
+    fit = np.polyval([slopeY, c], time)
+    ax2.plot(time, fit, '-', color = 'b', linewidth = 3, label = "p = " + str(np.round(slopeY, 4)) + "t + " + str(np.round(c, 4)))
     
-    m, c = np.polyfit(time, pz, 1)
-    fit = np.polyval([m, c], time)
-    ax3.plot(time, fit, '-', color = orange, linewidth = 3, label = "p = " + str(np.round(m, 4)) + "t + " + str(np.round(c, 4)))
+    slopeZ, c = np.polyfit(time, pz, 1)
+    fit = np.polyval([slopeZ, c], time)
+    ax3.plot(time, fit, '-', color = orange, linewidth = 3, label = "p = " + str(np.round(slopeZ, 4)) + "t + " + str(np.round(c, 4)))
 
     ax1.legend(prop={'size': 18})
     ax2.legend(prop={'size': 18})
@@ -1053,8 +1058,20 @@ def plotMomentum(px, py, pz, title):
     plt.savefig(title + ".pdf")
     plt.show()
 
+    return slopeX, slopeY, slopeZ
 
-def Compute(mode):
+def plotConvergence(data, ylabel, title):
+    
+    figure, ax = plt.subplots(1, 1, figsize = (10,7))
+    ax.plot(dt_array, data, 'o', color = pantone)
+    ax.set_xlabel("Timestep (s)", **font, size = 18)
+    ax.set_ylabel(ylabel, **font, size = 18)
+    ax.set_title(title)
+
+    plt.savefig(title + ".pdf")
+    plt.show()
+
+def Compute(mode, dt):
     """Compute positions and velocities for three different
     cases with the same initial conditions.
     
@@ -1078,7 +1095,7 @@ def Compute(mode):
 
     #PlotFrequencySweep()
 
-    EvolveEuler(Ba, BaH, "no laser")
+    EvolveEuler(Ba, BaH, "no laser", dt)
 
     del Ba, BaH
 
@@ -1114,13 +1131,13 @@ def Analyse(timestepTitle):
     BaH_v = np.sqrt(BaH_vx**2 + BaH_vy**2 + BaH_vz**2)
 
     totalEnergy = TotalEnergy(Ba_x, BaH_x, Ba_y, BaH_y, Ba_z, BaH_z, Ba_v, BaH_v)
-    plotEnergy(totalEnergy, "Energy, " + str(timestepTitle))
+    energySlope = plotEnergy(totalEnergy, "Energy, " + str(timestepTitle))
 
     px = TotalMomentum(Ba_vx, BaH_vx)
     py = TotalMomentum(Ba_vy, BaH_vy)
     pz = TotalMomentum(Ba_vz, BaH_vz)
-    plotMomentum(px, py, pz, "Momentum, " + str(timestepTitle))
-    
+    xMomentumSlope, yMomentumSlope, zMomentumSlope = plotMomentum(px, py, pz, "Momentum, " + str(timestepTitle))
+
     # Plot momentum of a single particle for comparison to check if the momentum conservation is violated
     # px_single = np.zeros(timesteps)
     # py_single = np.zeros(timesteps)
@@ -1131,6 +1148,8 @@ def Analyse(timestepTitle):
     #     pz_single[t] = (m_Ba * Ba_vz[t*N_Ba]) * (10**(-3)*c/charge)
     
     # plotMomentum(px_single, py_single, pz_single, "Single Particle Momentum, dt = tau")
+
+    return energySlope, xMomentumSlope, yMomentumSlope, zMomentumSlope
 
 # Fundamental constants
 k_B = 1.381 * 10**(-23)
@@ -1168,15 +1187,14 @@ N_Ba =  5 # number of Ba+ particles
 N_BaH = 5 # number of BaH+ particles
 particles = N_Ba+N_BaH
 R = 0.1*10**(-4) # [m], radius of the cylinder over which the particles are uniformly distributed
-dt = tau # [s], timestep, cannot be larger than 1/f = 2 * 10^(-6) s
+#dt = tau # [s], timestep, cannot be larger than 1/f = 2 * 10^(-6) s
 time = 3*10**(-3) # [s], total simulation time in s
 ms = int(time*10**(3)) # [ms], simulation time in ms
-T = int(time/dt) # number of timesteps for the whole simulation
+
 temp = 1 # [K], initial temperature
 
 # Convergence parameters
-t_step = 10**(-6) # [s], timestep to calculate the energy and momentum to check their conservation
-T_step = int(t_step/dt) # number of simulation timesteps in a convergence timestep
+t_step = 10**(-5) # [s], timestep to calculate the energy and momentum to check their conservation
 timesteps = int(time/t_step) # number of convergence timesteps
 
 # Plot parameters
@@ -1190,6 +1208,40 @@ plt.rcParams['axes.grid'] = True # Turn the grid on
 plt.rc('ytick', labelsize = 16)
 plt.rc('xtick', labelsize = 16)
 
-# Main Code
-Compute("save")
-Analyse("dt = tau")
+# Main code: run through different simulation timesteps to see
+# how the momentum and energy conservation change
+
+# Generate initial conditions for all the timesteps
+Ba = Ion(m_Ba, N_Ba, temp, 'Ba', "save")
+BaH = Ion(m_BaH, N_BaH, temp, 'BaH', "save")
+
+no_convergence = 10
+dt_array = np.linspace(10*tau, 100*tau, no_convergence)
+energySlopes = np.zeros(no_convergence)
+xMomentumSlopes = np.zeros(no_convergence)
+yMomentumSlopes = np.zeros(no_convergence)
+zMomentumSlopes = np.zeros(no_convergence)
+for i in range(no_convergence):
+    Compute("load", dt_array[i])
+    energySlopes[i], xMomentumSlopes[i], yMomentumSlopes[i], zMomentumSlopes[i] = Analyse("dt = " + str(np.round(dt_array[i]/tau)) + "tau")
+
+with open('Energy Slopes.npy', 'rb') as f:
+    for i in range(len(dt_array)):
+        energySlopes = np.append(energySlopes, np.load(f))
+
+with open('X-Momentum Slopes.npy', 'rb') as f:
+    for i in range(len(dt_array)):
+        xMomentumSlopes = np.append(xMomentumSlopes, np.load(f))
+
+with open('Y-Momentum Slopes.npy', 'rb') as f:
+    for i in range(len(dt_array)):
+        yMomentumSlopes = np.append(yMomentumSlopes, np.load(f))
+
+with open('Z-Momentum Slopes.npy', 'rb') as f:
+    for i in range(len(dt_array)):
+        zMomentumSlopes = np.append(zMomentumSlopes, np.load(f))
+
+plotConvergence(energySlopes, "Energy (meV)", "Energy Slope Convergence")
+#plotConvergence(xMomentumSlopes, "X-Momentum (keV/c)", "X-Momentum Slope Convergence")
+#plotConvergence(yMomentumSlopes, "Y-Momentum (keV/c)", "Y-Momentum SLope Convergence")
+#plotConvergence(zMomentumSlopes, "Z-Momentum (keV/c)", "Z-Momentum Slope Convergence")
