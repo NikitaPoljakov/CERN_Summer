@@ -466,7 +466,7 @@ def CoulombPotential(x, y, z, N):
     return potential
 
 
-def EvolveEuler(Ba, BaH, mode, dt):
+def EvolveEuler(Ba, BaH, dt):
     """Euler method. During each timestep evolve
     ions using Mathieu equations, add Coulomb
     interactions and then laser cool. Save the
@@ -541,10 +541,6 @@ def EvolveEuler(Ba, BaH, mode, dt):
         BaH.y = BaH.y + BaH.vy*dt
         BaH.z = BaH.z + BaH.vz*dt
 
-        # Perform the laser sweep until time
-        if mode == "laser":
-            LaserCool(Ba, float((t/T)*time))
-
     with open('Positions.npy', 'wb') as f:
         np.save(f, Ba_x)
         np.save(f, Ba_y)
@@ -560,257 +556,6 @@ def EvolveEuler(Ba, BaH, mode, dt):
         np.save(f, BaH_vx)
         np.save(f, BaH_vy)
         np.save(f, BaH_vz)
-    
-def LaserCool(Ba, t):
-    """Laser axis is along the y=x=z and y=-x, z=0 directions.
-
-    Args:
-        ion (obj): object containing positions and velocities
-        of ion species to be cooled
-    
-        t (float): time used for frequency sweep, [s]
-        
-        filename (str): title of the file used to trigger
-        or avoid frequency sweep
-        
-        ccd (int): 2D array containing the number of
-        scattered photons at certain points in space
-    """
-
-    f_0 = LinearFrequencySweep(t)
-
-    for n in range(Ba.N):
-        if Ba.state[n] == "e":
-            EmitAPhoton(Ba, n)
-
-        # Absorb a photon from a randomly selected laser
-        lasers = [FirstLaser, SecondLaser, ThirdLaser, FourthLaser, FifthLaser, SixthLaser]
-        shuffle(lasers)
-
-        for laser in lasers:
-            laser(Ba, n, f_0)
-
-
-def FirstLaser(Ba, n, f_0):
-    
-    # Z Laser
-    v_proj = -Ba.vz[n]
-    # Use the Accept-Reject algorithm to decide whether the ion absorbs a photon or not
-    lorentzian = Lorentzian(v_proj, f_0)
-    randomNumber = (3.12*10**(-8))*np.random.uniform() # 3.12*10**(-8) is approximately the peak of my Lorentzian curve
-    # Inelastic collision, photon momentum fully transferred to the ion
-    if (randomNumber < lorentzian) and Ba.state[n] == "g":
-        Ba.vz[n] = Ba.vz[n] + ((h*f_0)/(Ba.mass*c))
-        Ba.state[n] = "e"
-
-
-def SecondLaser(Ba, n, f_0):
-    
-    # Z Laser
-    v_proj = Ba.vz[n]
-    # Use the Accept-Reject algorithm to decide whether the ion absorbs a photon or not
-    lorentzian = Lorentzian(v_proj, f_0)
-    randomNumber = (3.12*10**(-8))*np.random.uniform() # 3.12*10**(-8) is approximately the peak of my Lorentzian curve
-    # Inelastic collision, photon momentum fully transferred to the ion
-    if (randomNumber < lorentzian) and Ba.state[n] == "g":
-        Ba.vz[n] = Ba.vz[n] - ((h*f_0)/(Ba.mass*c))
-        Ba.state[n] = "e"
-
-
-def ThirdLaser(Ba, n, f_0):
-    
-    # XY Laser
-    v_proj = (Ba.vx[n] + Ba.vy[n])/np.sqrt(2)
-    # Use the Accept-Reject algorithm to decide whether the ion absorbs a photon or not
-    lorentzian = Lorentzian(v_proj, f_0)
-    randomNumber = (3.12*10**(-8))*np.random.uniform() # 3.12*10**(-8) is approximately the peak of my Lorentzian curve
-    # Inelastic collision, photon momentum fully transferred to the ion
-    if (randomNumber < lorentzian) and Ba.state[n] == "g":
-        Ba.vx[n] = Ba.vx[n] - ((h*f_0)/(np.sqrt(2)*Ba.mass*c))
-        Ba.vy[n] = Ba.vy[n] - ((h*f_0)/(np.sqrt(2)*Ba.mass*c))
-        Ba.state[n] = "e"
-
-
-def FourthLaser(Ba, n, f_0):
-    
-    # XY Laser
-    v_proj = -(Ba.vx[n] + Ba.vy[n])/np.sqrt(2)
-    # Use the Accept-Reject algorithm to decide whether the ion absorbs a photon or not
-    lorentzian = Lorentzian(v_proj, f_0)
-    randomNumber = (3.12*10**(-8))*np.random.uniform() # 3.12*10**(-8) is approximately the peak of my Lorentzian curve
-    # Inelastic collision, photon momentum fully transferred to the ion
-    if (randomNumber < lorentzian) and Ba.state[n] == "g":
-        Ba.vx[n] = Ba.vx[n] + ((h*f_0)/(np.sqrt(2)*Ba.mass*c))
-        Ba.vy[n] = Ba.vy[n] + ((h*f_0)/(np.sqrt(2)*Ba.mass*c))
-        Ba.state[n] = "e"
-
-
-def FifthLaser(Ba, n, f_0):
-    
-    # XY Laser
-    v_proj = (-Ba.vx[n] + Ba.vy[n])/np.sqrt(2)
-    # Use the Accept-Reject algorithm to decide whether the ion absorbs a photon or not
-    lorentzian = Lorentzian(v_proj, f_0)
-    randomNumber = (3.12*10**(-8))*np.random.uniform() # 3.12*10**(-8) is approximately the peak of my Lorentzian curve
-    # Inelastic collision, photon momentum fully transferred to the ion
-    if (randomNumber < lorentzian) and Ba.state[n] == "g":
-        Ba.vx[n] = Ba.vx[n] + ((h*f_0)/(np.sqrt(2)*Ba.mass*c))
-        Ba.vy[n] = Ba.vy[n] - ((h*f_0)/(np.sqrt(2)*Ba.mass*c))
-        Ba.state[n] = "e"
-
-
-def SixthLaser(Ba, n, f_0):
-
-    # XY Laser
-    v_proj = (Ba.vx[n] - Ba.vy[n])/np.sqrt(2)
-    # Use the Accept-Reject algorithm to decide whether the ion absorbs a photon or not
-    lorentzian = Lorentzian(v_proj, f_0)
-    randomNumber = (3.12*10**(-8))*np.random.uniform() # 3.12*10**(-8) is approximately the peak of my Lorentzian curve
-    # Inelastic collision, photon momentum fully transferred to the ion
-    if (randomNumber < lorentzian) and Ba.state[n] == "g":
-        Ba.vx[n] = Ba.vx[n] - ((h*f_0)/(np.sqrt(2)*Ba.mass*c))
-        Ba.vy[n] = Ba.vy[n] + ((h*f_0)/(np.sqrt(2)*Ba.mass*c))
-        Ba.state[n] = "e"
-
-
-def LinearFrequencySweep(t):
-    """Calculate the frequency at a time t
-    fo r a linear frequency sweep with a 
-    period over the whole simulation.
-    
-    Args:
-        t (float): current time of the simulation, [s]
-        
-    Returns:
-        (float): laser photon frequency at time t, [Hz]
-    """
-    
-    return f_min + ((f_max-f_min) * t / time)
-
-
-def EmitAPhoton(ion, n):
-    """Emit a photon in an arbitrary direction.
-    Aberration not included.
-    
-    Args:
-        ion (obj): object containing positions and velocities
-        of ion species to be cooled
-        
-        n (int): index of the ion that is emitting a photon
-    """
-
-    #Pick random emission directions isotropically over a unit sphere
-    phi = np.random.uniform(0, 2*np.pi)
-    theta = ion.AcceptRejectTheta()
-
-    freq = AcceptRejectLorentzian()
-
-    # The particle will recoil in the opposite direction of the photon emission
-    ion.vx[n] -= ((h*freq)/(ion.mass*c))*np.sin(theta)*np.cos(phi)
-    ion.vy[n] -= ((h*freq)/(ion.mass*c))*np.sin(theta)*np.sin(phi)
-    ion.vz[n] -= ((h*freq)/(ion.mass*c))*np.cos(theta)
-
-    ion.state[n] = "g"
-
-
-def PlotFrequencySweep():
-    """Plot the swept frequency of the
-    laser vs time. """    
-
-    times = np.linspace(0, time, 1000)
-    frequencies = np.zeros(len(times))
-
-    for t in range(len(times)):
-            frequencies[t] = LinearFrequencySweep(times[t]) - f_r
-
-    font = {'fontname':'Cambria'}
-    fig, ax = plt.subplots(1, 1, figsize = (5, 4))
-
-    ax.plot((10**3)*times, (10**(-9))*frequencies, 'k-')
-    ax.set_xlabel("Time [ms]", **font, size = 18)
-    ax.set_ylabel("$f-f_r$ [GHz]", **font, size = 18)
-
-    ax.tick_params(axis="y", direction="in")
-    ax.tick_params(axis="x", direction="in")
-
-    plt.savefig("Frequency Sweep.pdf")
-    plt.show()
-
-
-def Lorentzian(v_proj, f_laser):
-    """Lorentzian describes the probability of a
-    photon absorption event given the velocity of
-    an ion projected onto the laser axis.
-    
-    Args:
-        v_proj (float): velocity of an ion projected
-        onto the laser axis
-    
-        f_laser (float): frequency of the laser
-    """
-
-    return (Gamma/(2*np.pi)) / (((f_r - f_laser - (v_proj/l_r))**2) + ((Gamma/2)**2))
-
-
-def AcceptRejectLorentzian():
-    """The Accept/Reject method replicates a distribution f(x) by following,
-    the following algorithm: 1) generate uniformly distributed random numbers,
-    x and y; 2) if y < f(x), accept the value, reject otherwise, 3) Repeat. """
-
-    while True:
-        freq = 10*Gamma * np.random.rand() + f_r - 5*Gamma
-        y = (3.12*10**(-8))*np.random.rand() # 3.12E-8 is the maximum of the Lorentzian
-        if y < Lorentzian(0, freq):
-            return freq
-        else:
-            continue
-
-
-def PlotAcceptRejectLorentzian():
-
-    freq = np.zeros(10000)
-    for n in range(10000):
-        freq[n] = AcceptRejectLorentzian()
-
-    plt.hist(freq, bins = 50)
-    plt.xlabel("Frequencies (Hz)")
-    plt.ylabel("Particles")
-    plt.title("Velocity distribution")
-    plt.show()
-
-
-def PlotLorentzian():
-    """Plot the Lorentzian probability distribution.
-    This curve describes the probability of a Ba+ ion
-    in an excited state to emit a photon at a certain
-    frequency.
-    """
-
-    freq = np.linspace(f_r-5*Gamma, f_r+5*Gamma, 1000, dtype = float)
-    pdf = np.zeros(len(freq))
-
-    for fr in range(len(freq)):
-        pdf[fr] = Lorentzian(0, freq[fr])
-
-    fig, ax = plt.subplots(1, 1, figsize = (7, 5))
-    ax.plot((10**(-9))*(freq - f_r), (10**9)*pdf, color = pantone, linewidth = 4)
-    ax.set_xlabel("$f - f_r$ [GHz]", **font, size = 21)
-    ax.set_ylabel("g(f) [$GHz^{-1}$]", **font, size = 21)
-    
-    ax.tick_params(axis="y", direction="in")
-    ax.tick_params(axis="x", direction="in")
-    
-    ax.axvline(0, color = orange, linestyle = 'dashed', linewidth = 4)
-    
-    ax.arrow(2*Gamma*10**(-9), 16, -Gamma*10**(-9), 0, width = 0.5, head_width = 2, head_length = 0.4*Gamma * 10**(-9), color = orange)
-    ax.arrow(-2*Gamma*10**(-9), 16, Gamma*10**(-9), 0, width = 0.5, head_width = 2, head_length = 0.4*Gamma * 10**(-9), color = orange)
-
-    ax.text(0.3*Gamma*10**(-9), 30, "$f_r$", **font, fontsize = 22)
-    ax.text(1.3*Gamma*10**(-9), 17, "$\Gamma$", **font, fontsize = 22)
-
-    #ax.legend(prop={'size': 15})
-    plt.savefig("Lorentzian.pdf")
-    plt.show()
 
 
 def PlotSpeeds(v_Ba, v_BaH):
@@ -1000,15 +745,19 @@ def plotEnergy(energy, title):
     ax.set_xlabel("Time (ms)", **font, size = 18)
     ax.set_ylabel("Energy (meV)", **font, size = 18)
 
-    slope, c = np.polyfit(time, energy, 1)
-    fit = np.polyval([slope, c], time)
-    ax.plot(time, fit, '-', color = orange, linewidth = 3, label = "E = " + str(np.round(slope, 4)) + "t + " + str(np.round(c, 4)))
-
+    par, cov = np.polyfit(time, energy, 1, full = False, cov = True)
+    slope, intercept = par
+    energySlopePerIntercept = (slope/intercept)*100
+    energyInterceptError = (np.sqrt(cov[1, 1])/intercept)*100
+    fit = np.polyval([slope, intercept], time)
+    ax.plot(time, fit, '-', color = orange, linewidth = 3, label = "E = " + str(np.round(slope, 4)) + "t + " + str(np.round(intercept, 4)))
+    print("Slope per intercept (check energy conservation): {}%".format(np.round(energySlopePerIntercept, 4)))
+    print("Relative error in intercept (energy dispersion): {}%".format(np.round(energyInterceptError, 4)))
     plt.legend(prop={'size': 18})
     plt.savefig(title + ".pdf")
     plt.show()
     
-    return slope
+    return energySlopePerIntercept, energyInterceptError
 
 
 def TotalMomentum(Ba_vi, BaH_vi):
@@ -1060,18 +809,27 @@ def plotMomentum(px, py, pz, title):
 
     return slopeX, slopeY, slopeZ
 
-def plotConvergence(data, ylabel, title):
+
+def plotConvergence(data, ylabel, title, analysis):
     
     figure, ax = plt.subplots(1, 1, figsize = (10,7))
-    ax.plot(dt_array, data, 'o', color = pantone)
-    ax.set_xlabel("Timestep (s)", **font, size = 18)
-    ax.set_ylabel(ylabel, **font, size = 18)
-    ax.set_title(title)
+    if analysis == "timesteps":
+        ax.axis([0, dt_array[-1]+tau, -0.1, 1])
+        ax.plot(dt_array, data, 'o', color = pantone)
+        ax.set_xlabel("Timestep (s)", **font, size = 18)
 
-    plt.savefig(title + ".pdf")
+    elif analysis == "particle number":
+        ax.axis([0, 2*N_array[-1]+1, -0.1, 1])
+        ax.plot(2*N_array, data, 'o', color = pantone)
+        ax.set_xlabel("Particle Number", **font, size = 18)
+
+    ax.set_ylabel(ylabel, **font, size = 18)
+    ax.set_title(title, **font, size = 18)
+    plt.savefig(title+".pdf")
     plt.show()
 
-def Compute(mode, dt):
+
+def Compute(mode, dt, N):
     """Compute positions and velocities for three different
     cases with the same initial conditions.
     
@@ -1084,8 +842,8 @@ def Compute(mode, dt):
 
     global f_min, f_max
 
-    Ba = Ion(m_Ba, N_Ba, temp, 'Ba', mode)
-    BaH = Ion(m_BaH, N_BaH, temp, 'BaH', mode)
+    Ba = Ion(m_Ba, N, temp, 'Ba', mode)
+    BaH = Ion(m_BaH, N, temp, 'BaH', mode)
 
     #Laser Sweep
     v_max = np.mean(np.sqrt(Ba.vx**2 + Ba.vy**2 + Ba.vz**2)) # [m/s], maximal value of the velocity projection that will absorb laser photons
@@ -1095,19 +853,17 @@ def Compute(mode, dt):
 
     #PlotFrequencySweep()
 
-    EvolveEuler(Ba, BaH, "no laser", dt)
+    EvolveEuler(Ba, BaH, dt)
 
     del Ba, BaH
 
 
-def Analyse(timestepTitle):
+def Analyse(timestepTitle, particleNumberTitle):
     """Calculate and plot the temperature evolution
     for both species and different directions.
 
     Args:
         timestepTitle (str): include the simulation timestep to the plot pdf name.
-
-
     """
 
     with open('Positions.npy', 'rb') as f:
@@ -1131,12 +887,12 @@ def Analyse(timestepTitle):
     BaH_v = np.sqrt(BaH_vx**2 + BaH_vy**2 + BaH_vz**2)
 
     totalEnergy = TotalEnergy(Ba_x, BaH_x, Ba_y, BaH_y, Ba_z, BaH_z, Ba_v, BaH_v)
-    energySlope = plotEnergy(totalEnergy, "Energy, " + str(timestepTitle))
+    energySlopePerIntercept, energyInterceptError = plotEnergy(totalEnergy, "Energy, "+str(timestepTitle) + ", " + str(particleNumberTitle))
 
-    px = TotalMomentum(Ba_vx, BaH_vx)
-    py = TotalMomentum(Ba_vy, BaH_vy)
-    pz = TotalMomentum(Ba_vz, BaH_vz)
-    xMomentumSlope, yMomentumSlope, zMomentumSlope = plotMomentum(px, py, pz, "Momentum, " + str(timestepTitle))
+    #px = TotalMomentum(Ba_vx, BaH_vx)
+    #py = TotalMomentum(Ba_vy, BaH_vy)
+    #pz = TotalMomentum(Ba_vz, BaH_vz)
+    #plotMomentum(px, py, pz, "Momentum, " + str(timestepTitle))
 
     # Plot momentum of a single particle for comparison to check if the momentum conservation is violated
     # px_single = np.zeros(timesteps)
@@ -1149,7 +905,7 @@ def Analyse(timestepTitle):
     
     # plotMomentum(px_single, py_single, pz_single, "Single Particle Momentum, dt = tau")
 
-    return energySlope, xMomentumSlope, yMomentumSlope, zMomentumSlope
+    return energySlopePerIntercept, energyInterceptError
 
 # Fundamental constants
 k_B = 1.381 * 10**(-23)
@@ -1183,8 +939,8 @@ U_endcap = a_lc*m_Ba*(w**2)*r_0**2/(4*charge*alpha) # [V], endcap DC voltage
 V_RF = q_lc*m_Ba*(w**2)*r_0**2/(2*charge) # [V], RF voltage amplitude
 
 # Simulation parameters
-N_Ba =  5 # number of Ba+ particles
-N_BaH = 5 # number of BaH+ particles
+N_Ba =  10 # number of Ba+ particles
+N_BaH = 10 # number of BaH+ particles
 particles = N_Ba+N_BaH
 R = 0.1*10**(-4) # [m], radius of the cylinder over which the particles are uniformly distributed
 #dt = tau # [s], timestep, cannot be larger than 1/f = 2 * 10^(-6) s
@@ -1211,21 +967,45 @@ plt.rc('xtick', labelsize = 16)
 # Main code: run through different simulation timesteps to see
 # how the momentum and energy conservation change
 
-# Generate initial conditions for all the timesteps
-Ba = Ion(m_Ba, N_Ba, temp, 'Ba', "save")
-BaH = Ion(m_BaH, N_BaH, temp, 'BaH', "save")
+#Compute("save", 0.1*tau)
 
 no_convergence = 10
-dt_array = np.linspace(10*tau, 100*tau, no_convergence)
-energySlopes = np.zeros(no_convergence)
-xMomentumSlopes = np.zeros(no_convergence)
-yMomentumSlopes = np.zeros(no_convergence)
-zMomentumSlopes = np.zeros(no_convergence)
-for i in range(no_convergence):
-    Compute("load", dt_array[i])
-    energySlopes[i], xMomentumSlopes[i], yMomentumSlopes[i], zMomentumSlopes[i] = Analyse("dt = " + str(np.round(dt_array[i]/tau)) + "tau")
+dt_array = np.linspace(tau, 50*tau, no_convergence)
+N_array = np.linspace(5, 50, no_convergence, dtype = int)
 
-plotConvergence(energySlopes, "Energy (meV)", "Energy Slope Convergence")
-plotConvergence(xMomentumSlopes, "X-Momentum (keV/c)", "X-Momentum Slope Convergence")
-plotConvergence(yMomentumSlopes, "Y-Momentum (keV/c)", "Y-Momentum SLope Convergence")
-plotConvergence(zMomentumSlopes, "Z-Momentum (keV/c)", "Z-Momentum Slope Convergence")
+energySlopesPerIntercept = np.zeros(no_convergence)
+energyInterceptErrors = np.zeros(no_convergence)
+# Choose "timesteps" to analyse convergence for varying timesteps
+# Choose "particle number" to analyse convergence for varying particle number
+analysis = "timesteps"
+# Can either save or load the slopes for analysis
+mode = "save"
+
+if mode == "save":
+    # Generate the same initial conditions for all the timesteps
+    Ba = Ion(m_Ba, N_Ba, temp, 'Ba', "save")
+    BaH = Ion(m_BaH, N_BaH, temp, 'BaH', "save")
+
+    for i in range(no_convergence):
+        if analysis == "timesteps":
+            Compute("load", dt_array[i], N_Ba) # Load the conditions that were previously saved
+            energySlopesPerIntercept[i], energyInterceptErrors[i] = Analyse("dt = " + str(np.round(dt_array[i]/tau)) + "tau", "N = " + str(N_Ba+N_BaH))
+
+        elif analysis == "particle number":
+            Compute("save", 10*tau, N_array[i]) # Cannot fix the same initial conditions for the varying particle number
+            energySlopesPerIntercept[i], energyInterceptErrors[i] = Analyse("dt = 5tau", "N = " + str(N_array[i]))
+
+    with open('Energy Slopes per Intercept.npy', 'wb') as f:
+        np.save(f, energySlopesPerIntercept)
+    with open('Energy Intercept Errors.npy', 'wb') as f:
+        np.save(f, energyInterceptErrors)
+
+elif mode == "load":
+    with open('Energy Slopes per Intercept.npy', 'rb') as f:
+        energySlopesPerIntercept = np.load(f)
+    with open('Energy Intercept Errors.npy', 'rb') as f:
+        energyInterceptErrors = np.load(f)
+
+
+plotConvergence(energySlopesPerIntercept, "Slope per Intercept (%)", "Energy Slope Convergence", analysis)
+plotConvergence(energyInterceptErrors, "Relative Intercept Error (%)", "Energy Intercept Convergence", analysis)
