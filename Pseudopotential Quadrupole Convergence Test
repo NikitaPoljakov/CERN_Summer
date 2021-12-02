@@ -814,12 +814,15 @@ def plotConvergence(data, ylabel, title, analysis):
     
     figure, ax = plt.subplots(1, 1, figsize = (10,7))
     if analysis == "timesteps":
-        ax.axis([0, dt_array[-1]+tau, -0.1, 1])
+        #ax.axis([0, dt_array[-1]+tau, -0.1, 1])
         ax.plot(dt_array, data, 'o', color = pantone)
+        ax.set_xscale('log')
         ax.set_xlabel("Timestep (s)", **font, size = 18)
+        ax.set_xticks([0.1*tau, tau, 10*tau, 100*tau])
+        ax.set_xticklabels([r'$0.1\tau$', r'$\tau$', r'$10\tau$', r'$100\tau$'])
 
     elif analysis == "particle number":
-        ax.axis([0, 2*N_array[-1]+1, -0.1, 1])
+        #ax.axis([0, 2*N_array[-1]+1, -0.1, 1])
         ax.plot(2*N_array, data, 'o', color = pantone)
         ax.set_xlabel("Particle Number", **font, size = 18)
 
@@ -939,8 +942,8 @@ U_endcap = a_lc*m_Ba*(w**2)*r_0**2/(4*charge*alpha) # [V], endcap DC voltage
 V_RF = q_lc*m_Ba*(w**2)*r_0**2/(2*charge) # [V], RF voltage amplitude
 
 # Simulation parameters
-N_Ba =  10 # number of Ba+ particles
-N_BaH = 10 # number of BaH+ particles
+N_Ba =  5 # number of Ba+ particles
+N_BaH = 5 # number of BaH+ particles
 particles = N_Ba+N_BaH
 R = 0.1*10**(-4) # [m], radius of the cylinder over which the particles are uniformly distributed
 #dt = tau # [s], timestep, cannot be larger than 1/f = 2 * 10^(-6) s
@@ -970,7 +973,7 @@ plt.rc('xtick', labelsize = 16)
 #Compute("save", 0.1*tau)
 
 no_convergence = 10
-dt_array = np.linspace(tau, 50*tau, no_convergence)
+dt_array = np.logspace(-1, 2, no_convergence)*tau
 N_array = np.linspace(5, 50, no_convergence, dtype = int)
 
 energySlopesPerIntercept = np.zeros(no_convergence)
@@ -992,7 +995,7 @@ if mode == "save":
             energySlopesPerIntercept[i], energyInterceptErrors[i] = Analyse("dt = " + str(np.round(dt_array[i]/tau)) + "tau", "N = " + str(N_Ba+N_BaH))
 
         elif analysis == "particle number":
-            Compute("save", 10*tau, N_array[i]) # Cannot fix the same initial conditions for the varying particle number
+            Compute("save", tau, N_array[i]) # Cannot fix the same initial conditions for the varying particle number
             energySlopesPerIntercept[i], energyInterceptErrors[i] = Analyse("dt = 5tau", "N = " + str(N_array[i]))
 
     with open('Energy Slopes per Intercept.npy', 'wb') as f:
@@ -1005,7 +1008,6 @@ elif mode == "load":
         energySlopesPerIntercept = np.load(f)
     with open('Energy Intercept Errors.npy', 'rb') as f:
         energyInterceptErrors = np.load(f)
-
 
 plotConvergence(energySlopesPerIntercept, "Slope per Intercept (%)", "Energy Slope Convergence", analysis)
 plotConvergence(energyInterceptErrors, "Relative Intercept Error (%)", "Energy Intercept Convergence", analysis)
